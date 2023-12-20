@@ -14,6 +14,28 @@ namespace rime {
 
 static const int kEncoderDfsLimit = 32;
 static const int kMaxPhraseLength = 32;
+// U+00B7 MIDDLE DOT, U+2027 HYPHENATION POINT, U+2010 HYPHEN,
+// U+FF0D FULLWIDTH HYPHEN-MINUS, U+FF0C FULLWIDTH COMMA
+// U+FF08 FULLWIDTH LEFT PARENTHESIS, U+FF09 FULLWIDTH RIGHT PARENTHESIS
+static const string& interpuncts =
+    "\xc2\xb7\xe2\x80\xa7\xe2\x80\x90\xef\xbc\x8d\xef\xbc\x8c"
+    "\xef\xbc\x88\xef\xbc\x89";
+
+string stripPunct(const string& phrase) {
+  string phrase_no_punct;
+  size_t start_pos = 0;
+  while (start_pos < phrase.length()) {
+    const char* word_start = phrase.c_str() + start_pos;
+    const char* word_end = word_start;
+    utf8::unchecked::next(word_end);
+    size_t word_len = word_end - word_start;
+    string word(word_start, word_len);
+    if (interpuncts.find(word) == string::npos)
+      phrase_no_punct += word;
+    start_pos += word_len;
+  }
+  return phrase_no_punct;
+}
 
 string RawCode::ToString() const {
   return strings::join(*this, " ");
@@ -234,8 +256,10 @@ int TableEncoder::CalculateCodeIndex(const string& code, int index, int start) {
 }
 
 bool TableEncoder::EncodePhrase(const string& phrase, const string& value) {
+  string phrase_no_punct = stripPunct(phrase);
   size_t phrase_length = utf8::unchecked::distance(
-      phrase.c_str(), phrase.c_str() + phrase.length());
+      phrase_no_punct.c_str(),
+      phrase_no_punct.c_str() + phrase_no_punct.length());
   if (static_cast<int>(phrase_length) > max_phrase_length_)
     return false;
 
@@ -249,7 +273,8 @@ bool TableEncoder::DfsEncode(const string& phrase,
                              size_t start_pos,
                              RawCode* code,
                              int* limit) {
-  if (start_pos == phrase.length()) {
+  string phrase_no_punct = stripPunct(phrase);
+  if (start_pos == phrase_no_punct.length()) {
     if (limit) {
       --*limit;
     }
@@ -265,7 +290,7 @@ bool TableEncoder::DfsEncode(const string& phrase,
       return false;
     }
   }
-  const char* word_start = phrase.c_str() + start_pos;
+  const char* word_start = phrase_no_punct.c_str() + start_pos;
   const char* word_end = word_start;
   utf8::unchecked::next(word_end);
   size_t word_len = word_end - word_start;
@@ -292,8 +317,10 @@ bool TableEncoder::DfsEncode(const string& phrase,
 ScriptEncoder::ScriptEncoder(PhraseCollector* collector) : Encoder(collector) {}
 
 bool ScriptEncoder::EncodePhrase(const string& phrase, const string& value) {
+  string phrase_no_punct = stripPunct(phrase);
   size_t phrase_length = utf8::unchecked::distance(
-      phrase.c_str(), phrase.c_str() + phrase.length());
+      phrase_no_punct.c_str(),
+      phrase_no_punct.c_str() + phrase_no_punct.length());
   if (static_cast<int>(phrase_length) > kMaxPhraseLength)
     return false;
 
@@ -307,7 +334,8 @@ bool ScriptEncoder::DfsEncode(const string& phrase,
                               size_t start_pos,
                               RawCode* code,
                               int* limit) {
-  if (start_pos == phrase.length()) {
+  string phrase_no_punct = stripPunct(phrase);
+  if (start_pos == phrase_no_punct.length()) {
     if (limit) {
       --*limit;
     }
@@ -315,8 +343,8 @@ bool ScriptEncoder::DfsEncode(const string& phrase,
     return true;
   }
   bool ret = false;
-  for (size_t k = phrase.length() - start_pos; k > 0; --k) {
-    string word(phrase.substr(start_pos, k));
+  for (size_t k = phrase_no_punct.length() - start_pos; k > 0; --k) {
+    string word(phrase_no_punct.substr(start_pos, k));
     vector<string> translations;
     if (collector_->TranslateWord(word, &translations)) {
       for (const string& x : translations) {
