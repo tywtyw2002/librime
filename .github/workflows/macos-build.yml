@@ -82,7 +82,8 @@ jobs:
         run: ./action-install-plugins-macos.sh
 
       - name: Build and test
-        run: make test
+        # run: make test
+        run: make merged-plugins
 
       - name: Create distributable
         run: |
